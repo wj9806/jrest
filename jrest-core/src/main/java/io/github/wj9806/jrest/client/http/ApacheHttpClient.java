@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.*;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
@@ -12,7 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.URI;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,13 +59,21 @@ public class ApacheHttpClient extends AbstractHttpClient {
                 case "POST":
                     HttpPost httpPost = new HttpPost(uriBuilder.build());
                     // 设置POST请求体
-                    setRequestBody(httpPost, httpRequest.getBody());
+                    if (httpRequest.isFormData()) {
+                        setMultipartRequestBody(httpPost, httpRequest.getBody(), httpRequest.getFormData(), httpRequest.getMultipartFiles());
+                    } else {
+                        setRequestBody(httpPost, httpRequest.getBody());
+                    }
                     requestBase = httpPost;
                     break;
                 case "PUT":
                     HttpPut httpPut = new HttpPut(uriBuilder.build());
                     // 设置PUT请求体
-                    setRequestBody(httpPut, httpRequest.getBody());
+                    if (httpRequest.isFormData()) {
+                        setMultipartRequestBody(httpPut, httpRequest.getBody(), httpRequest.getFormData(), httpRequest.getMultipartFiles());
+                    } else {
+                        setRequestBody(httpPut, httpRequest.getBody());
+                    }
                     requestBase = httpPut;
                     break;
                 case "DELETE":
@@ -76,6 +86,18 @@ public class ApacheHttpClient extends AbstractHttpClient {
             // 添加请求头
             if (httpRequest.getHeaders() != null && !httpRequest.getHeaders().isEmpty()) {
                 httpRequest.getHeaders().forEach(requestBase::addHeader);
+            }
+            
+            // 添加Cookie
+            if (httpRequest.getCookies() != null && !httpRequest.getCookies().isEmpty()) {
+                StringBuilder cookieBuilder = new StringBuilder();
+                for (Map.Entry<String, String> cookie : httpRequest.getCookies().entrySet()) {
+                    if (cookieBuilder.length() > 0) {
+                        cookieBuilder.append(";");
+                    }
+                    cookieBuilder.append(cookie.getKey()).append("=").append(cookie.getValue());
+                }
+                requestBase.addHeader("Cookie", cookieBuilder.toString());
             }
             
             logger.debug("Sending {} request to: {}", httpRequest.getMethod(), requestBase.getURI());
@@ -94,10 +116,58 @@ public class ApacheHttpClient extends AbstractHttpClient {
      */
     private void setRequestBody(HttpEntityEnclosingRequestBase request, Object body) throws IOException {
         if (body != null) {
+            // 处理JSON请求体
             String jsonBody = objectMapper.writeValueAsString(body);
             request.setEntity(new StringEntity(jsonBody, "UTF-8"));
             request.addHeader("Content-Type", "application/json");
         }
+    }
+
+    /**
+     * 设置multipart请求体
+     */
+    private void setMultipartRequestBody(HttpEntityEnclosingRequestBase request, Object body, Map<String, Object> formData, Map<String, MultipartFile> multipartFiles) throws IOException {
+        MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+
+        // 添加表单字段
+        if (formData != null && !formData.isEmpty()) {
+            for (Map.Entry<String, Object> entry : formData.entrySet()) {
+                String name = entry.getKey();
+                Object value = entry.getValue();
+                if (value != null) {
+                    builder.addTextBody(name, value.toString(), ContentType.TEXT_PLAIN);
+                }
+            }
+        }
+
+        // 添加文件
+        if (multipartFiles != null && !multipartFiles.isEmpty()) {
+            for (Map.Entry<String, MultipartFile> entry : multipartFiles.entrySet()) {
+                String name = entry.getKey();
+                MultipartFile file = entry.getValue();
+
+                ContentType contentType = ContentType.APPLICATION_OCTET_STREAM;
+                if (file.getContentType() != null) {
+                    try {
+                        contentType = ContentType.parse(file.getContentType());
+                    } catch (Exception e) {
+                        logger.debug("Invalid content type: {}", file.getContentType(), e);
+                    }
+                }
+
+                // 不使用try-with-resources，让MultipartEntityBuilder自己管理InputStream的关闭
+                InputStream is = file.getInputStream();
+                builder.addBinaryBody(
+                    name,
+                    is,
+                    contentType,
+                    file.getOriginalFilename()
+                );
+            }
+        }
+
+        // 设置实体
+        request.setEntity(builder.build());
     }
     
     /**

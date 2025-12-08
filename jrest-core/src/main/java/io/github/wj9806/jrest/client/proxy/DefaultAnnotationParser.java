@@ -1,5 +1,7 @@
 package io.github.wj9806.jrest.client.proxy;
 
+import io.github.wj9806.jrest.client.http.MultipartFile;
+import io.github.wj9806.jrest.client.http.DefaultMultipartFile;
 import io.github.wj9806.jrest.client.annotation.*;
 import io.github.wj9806.jrest.client.http.HttpRequest;
 import org.slf4j.Logger;
@@ -65,7 +67,11 @@ public class DefaultAnnotationParser implements AnnotationParser {
         // 解析参数
         Map<String, String> headers = new HashMap<>();
         Map<String, Object> queryParams = new HashMap<>();
+        Map<String, String> cookies = new HashMap<>();
         Object requestBody = null;
+        Map<String, MultipartFile> multipartFiles = new HashMap<>();
+        Map<String, Object> formData = new HashMap<>();
+        boolean hasFormData = false;
         
         Annotation[][] parameterAnnotations = method.getParameterAnnotations();
         for (int i = 0; i < parameterAnnotations.length; i++) {
@@ -77,24 +83,88 @@ public class DefaultAnnotationParser implements AnnotationParser {
                     // 路径参数已经在buildRequestUrl中处理
                 } else if (annotation instanceof QueryParam) {
                     QueryParam queryParam = (QueryParam) annotation;
-                    queryParams.put(queryParam.value(), arg);
+                    String name = queryParam.value();
+                    // 如果没有指定value，则使用参数名称
+                    if (name.isEmpty()) {
+                        name = method.getParameters()[i].getName();
+                    }
+                    queryParams.put(name, arg);
                 } else if (annotation instanceof RequestBody) {
                     requestBody = arg;
                 } else if (annotation instanceof Header) {
                     Header header = (Header) annotation;
-                    headers.put(header.value(), arg != null ? arg.toString() : null);
+                    String name = header.value();
+                    // 如果没有指定value，则使用参数名称
+                    if (name.isEmpty()) {
+                        name = method.getParameters()[i].getName();
+                    }
+                    headers.put(name, arg != null ? arg.toString() : null);
+                } else if (annotation instanceof Cookie) {
+                    Cookie cookie = (Cookie) annotation;
+                    String name = cookie.value();
+                    // 如果没有指定value，则使用参数名称
+                    if (name.isEmpty()) {
+                        name = method.getParameters()[i].getName();
+                    }
+                    cookies.put(name, arg != null ? arg.toString() : null);
+                } else if (annotation instanceof RequestPart) {
+                    RequestPart requestPart = (RequestPart) annotation;
+                    String name = requestPart.value();
+                    // 如果没有指定value，则使用参数名称
+                    if (name.isEmpty()) {
+                        name = method.getParameters()[i].getName();
+                    }
+                    if (arg instanceof MultipartFile) {
+                        multipartFiles.put(name, (MultipartFile) arg);
+                        hasFormData = true;
+                    } else if (arg instanceof java.io.File) {
+                        // 支持File类型参数，自动转换为MultipartFile
+                        multipartFiles.put(name, new DefaultMultipartFile(name, (java.io.File) arg));
+                        hasFormData = true;
+                    } else {
+                        throw new IllegalArgumentException("RequestPart parameter must be of type MultipartFile or File");
+                    }
+                } else if (annotation instanceof FormField) {
+                    FormField formField = (FormField) annotation;
+                    String name = formField.value();
+                    // 如果没有指定value，则使用参数名称
+                    if (name.isEmpty()) {
+                        name = method.getParameters()[i].getName();
+                    }
+                    formData.put(name, arg);
+                    hasFormData = true;
                 }
             }
         }
         
         // 创建HttpRequest对象
-        return new HttpRequest.Builder()
+        HttpRequest.Builder builder = new HttpRequest.Builder()
                 .url(requestUrl)
                 .method(httpMethod)
                 .headers(headers)
                 .queryParams(queryParams)
-                .body(requestBody)
-                .build();
+                .cookies(cookies);
+                
+        // 设置请求体和表单数据
+        if (hasFormData) {
+            builder.formData(formData);
+            if (!multipartFiles.isEmpty()) {
+                builder.multipartFiles(multipartFiles);
+            }
+            // 如果有body且不是InputStream类型，将其转换为form字段
+            if (requestBody != null && !(requestBody instanceof java.io.InputStream)) {
+                builder.formField("body", requestBody);
+            }
+        } else if (requestBody != null) {
+            builder.body(requestBody);
+        }
+        
+        // 添加multipart文件
+        if (!multipartFiles.isEmpty() && !hasFormData) {
+            builder.multipartFiles(multipartFiles);
+        }
+        
+        return builder.build();
     }
     
     /**
@@ -146,13 +216,13 @@ public class DefaultAnnotationParser implements AnnotationParser {
         }
         
         // 构建完整URL
-        String fullUrl = baseUrl;
+        String fullUrl = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
         if (!path.isEmpty() && !path.startsWith("/")) {
-            fullUrl += (fullUrl.endsWith("/") ? "" : "/") + path;
-        } else if (!path.isEmpty()) {
             fullUrl += path;
+        } else {
+            fullUrl += path.substring(1);
         }
-        
+
         logger.debug("Built request URL: {}", fullUrl);
         return fullUrl;
     }

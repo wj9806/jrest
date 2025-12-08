@@ -3,7 +3,6 @@ package io.github.wj9806.jrest.client.proxy;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.wj9806.jrest.client.annotation.*;
 import io.github.wj9806.jrest.client.http.HttpClient;
 import io.github.wj9806.jrest.client.http.HttpRequest;
 import io.github.wj9806.jrest.client.http.HttpResponse;

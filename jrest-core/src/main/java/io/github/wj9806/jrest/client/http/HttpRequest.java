@@ -11,14 +11,30 @@ public class HttpRequest {
     private String method;
     private Map<String, String> headers;
     private Map<String, Object> queryParams;
+    private Map<String, String> cookies;
     private Object body;
+    private Map<String, MultipartFile> multipartFiles;
+    private Map<String, Object> formData;
+    private boolean isFormData;
+
+    /**
+     * 检查是否为form-data请求
+     * @return 是否为form-data请求
+     */
+    public boolean isFormData() {
+        return isFormData || hasMultipartFiles() || (formData != null && !formData.isEmpty());
+    }
 
     private HttpRequest(Builder builder) {
         this.url = builder.url;
         this.method = builder.method;
         this.headers = builder.headers;
         this.queryParams = builder.queryParams;
+        this.cookies = builder.cookies;
         this.body = builder.body;
+        this.multipartFiles = builder.multipartFiles;
+        this.formData = builder.formData;
+        this.isFormData = builder.isFormData;
     }
 
     /**
@@ -60,6 +76,46 @@ public class HttpRequest {
     public Object getBody() {
         return body;
     }
+    
+    /**
+     * 获取Cookie
+     * @return Cookie
+     */
+    public Map<String, String> getCookies() {
+        return cookies;
+    }
+    
+    /**
+     * 获取multipart文件
+     * @return multipart文件
+     */
+    public Map<String, MultipartFile> getMultipartFiles() {
+        return multipartFiles;
+    }
+    
+    /**
+     * 是否包含multipart文件
+     * @return 是否包含multipart文件
+     */
+    public boolean hasMultipartFiles() {
+        return multipartFiles != null && !multipartFiles.isEmpty();
+    }
+    
+    /**
+     * 获取表单数据
+     * @return 表单数据
+     */
+    public Map<String, Object> getFormData() {
+        return formData;
+    }
+    
+    /**
+     * 是否包含表单数据
+     * @return 是否包含表单数据
+     */
+    public boolean hasFormData() {
+        return formData != null && !formData.isEmpty();
+    }
 
     /**
      * HttpRequest构建器
@@ -69,7 +125,43 @@ public class HttpRequest {
         private String method;
         private Map<String, String> headers = new HashMap<>();
         private Map<String, Object> queryParams = new HashMap<>();
+        private Map<String, String> cookies = new HashMap<>();
         private Object body;
+        private Map<String, MultipartFile> multipartFiles = new HashMap<>();
+        private Map<String, Object> formData = new HashMap<>();
+        private boolean isFormData = false;
+        
+        /**
+         * 设置为form-data请求
+         * @return Builder实例
+         */
+        public Builder formData() {
+            this.isFormData = true;
+            return this;
+        }
+        
+        /**
+         * 添加表单字段
+         * @param name 字段名
+         * @param value 字段值
+         * @return Builder实例
+         */
+        public Builder formField(String name, Object value) {
+            this.formData.put(name, value);
+            this.isFormData = true;
+            return this;
+        }
+        
+        /**
+         * 设置表单数据
+         * @param formData 表单数据
+         * @return Builder实例
+         */
+        public Builder formData(Map<String, Object> formData) {
+            this.formData.putAll(formData);
+            this.isFormData = true;
+            return this;
+        }
 
         public Builder() {}
 
@@ -178,6 +270,48 @@ public class HttpRequest {
          */
         public Builder body(Object body) {
             this.body = body;
+            return this;
+        }
+        
+        /**
+         * 添加multipart文件
+         * @param name 参数名称
+         * @param file 文件
+         * @return Builder实例
+         */
+        public Builder addMultipartFile(String name, MultipartFile file) {
+            this.multipartFiles.put(name, file);
+            return this;
+        }
+        
+        /**
+         * 设置multipart文件
+         * @param multipartFiles multipart文件
+         * @return Builder实例
+         */
+        public Builder multipartFiles(Map<String, MultipartFile> multipartFiles) {
+            this.multipartFiles.putAll(multipartFiles);
+            return this;
+        }
+        
+        /**
+         * 添加Cookie
+         * @param name Cookie名称
+         * @param value Cookie值
+         * @return Builder实例
+         */
+        public Builder cookie(String name, String value) {
+            this.cookies.put(name, value);
+            return this;
+        }
+        
+        /**
+         * 设置Cookie
+         * @param cookies Cookie
+         * @return Builder实例
+         */
+        public Builder cookies(Map<String, String> cookies) {
+            this.cookies.putAll(cookies);
             return this;
         }
 

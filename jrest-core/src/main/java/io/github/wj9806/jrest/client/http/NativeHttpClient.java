@@ -53,14 +53,99 @@ public class NativeHttpClient extends AbstractHttpClient {
             httpRequest.getHeaders().forEach(connection::setRequestProperty);
         }
         
+        // 设置Cookie
+        if (httpRequest.getCookies() != null && !httpRequest.getCookies().isEmpty()) {
+            StringBuilder cookieBuilder = new StringBuilder();
+            for (Map.Entry<String, String> cookie : httpRequest.getCookies().entrySet()) {
+                if (cookieBuilder.length() > 0) {
+                    cookieBuilder.append(";");
+                }
+                cookieBuilder.append(cookie.getKey()).append("=").append(cookie.getValue());
+            }
+            connection.setRequestProperty("Cookie", cookieBuilder.toString());
+        }
+        
         // 设置请求体
-        if (("POST".equals(method) || "PUT".equals(method)) && httpRequest.getBody() != null) {
-            String jsonBody = objectMapper.writeValueAsString(httpRequest.getBody());
-            connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-            
-            try (OutputStream os = connection.getOutputStream()) {
-                byte[] input = jsonBody.getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
+        if (("POST".equals(method) || "PUT".equals(method))) {
+            // 处理multipart/form-data请求
+            if (httpRequest.isFormData()) {
+                String boundary = "----WebKitFormBoundary" + System.currentTimeMillis();
+                connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+                
+                try (OutputStream os = connection.getOutputStream();
+                     PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8), true)) {
+                    
+                    // 写入文件
+                    for (Map.Entry<String, MultipartFile> entry : httpRequest.getMultipartFiles().entrySet()) {
+                        String name = entry.getKey();
+                        MultipartFile file = entry.getValue();
+                        
+                        writer.append("--").append(boundary).println();
+                        writer.append("Content-Disposition: form-data; name=\"").append(name).append("\"; filename=\"").append(file.getOriginalFilename()).append("\"").println();
+                        writer.append("Content-Type: ").append(file.getContentType() != null ? file.getContentType() : "application/octet-stream").println();
+                        writer.append("Content-Transfer-Encoding: binary").println();
+                        writer.println();
+                        writer.flush();
+                        
+                        try (InputStream is = file.getInputStream()) {
+                            byte[] buffer = new byte[4096];
+                            int bytesRead;
+                            while ((bytesRead = is.read(buffer)) != -1) {
+                                os.write(buffer, 0, bytesRead);
+                            }
+                            os.flush();
+                        }
+                        
+                        writer.println();
+                        writer.flush();
+                    }
+                    
+                    // 写入表单字段
+                    if (httpRequest.hasFormData()) {
+                        for (Map.Entry<String, Object> entry : httpRequest.getFormData().entrySet()) {
+                            String name = entry.getKey();
+                            Object value = entry.getValue();
+                            
+                            writer.append("--").append(boundary).println();
+                            writer.append("Content-Disposition: form-data; name=\"").append(name).append("\"") .println();
+                            writer.println();
+                            writer.print(value != null ? value.toString() : "");
+                            writer.println();
+                            writer.flush();
+                        }
+                    }
+                    
+                    // 结束边界
+                    writer.append("--").append(boundary).append("--").println();
+                    writer.flush();
+                    
+                } catch (IOException e) {
+                    logger.error("Error writing multipart request", e);
+                    throw e;
+                }
+            } 
+            // 处理其他类型的请求体
+            else if (httpRequest.getBody() != null) {
+                if (httpRequest.getBody() instanceof InputStream) {
+                    // 处理文件流请求体
+                    try (OutputStream os = connection.getOutputStream()) {
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        InputStream is = (InputStream) httpRequest.getBody();
+                        while ((bytesRead = is.read(buffer)) != -1) {
+                            os.write(buffer, 0, bytesRead);
+                        }
+                    }
+                } else {
+                    // 处理JSON请求体
+                    String jsonBody = objectMapper.writeValueAsString(httpRequest.getBody());
+                    connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                    
+                    try (OutputStream os = connection.getOutputStream()) {
+                        byte[] input = jsonBody.getBytes(StandardCharsets.UTF_8);
+                        os.write(input, 0, input.length);
+                    }
+                }
             }
         }
         
