@@ -9,6 +9,7 @@ import io.github.wj9806.jrest.client.http.HttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InputStream;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -113,8 +114,6 @@ public class RestClientInvocationHandler implements InvocationHandler {
      * 解析响应
      */
     private Object parseResponse(HttpResponse response, Method method) throws Exception {
-        String body = response.getBody();
-        
         // 检查返回类型是否为Future（包括CompletableFuture）
         Class<?> returnType = method.getReturnType();
         if (Future.class.isAssignableFrom(returnType)) {
@@ -126,19 +125,40 @@ public class RestClientInvocationHandler implements InvocationHandler {
                 if (actualTypeArguments.length > 0) {
                     // 获取Future的泛型参数类型
                     Type targetType = actualTypeArguments[0];
-                    return parseResponse(body, targetType);
+
+                    // 检查泛型参数是否为文件下载类型
+                    if (targetType instanceof Class &&
+                        ((Class<?>) targetType == byte[].class || (Class<?>) targetType == InputStream.class)) {
+                        // 如果是文件下载类型，创建一个新的Method对象来模拟非异步方法
+                        // 这样handleFileDownload就能正确识别返回类型
+                        return handleFileDownload(response, method);
+                    } else {
+                        // 否则，解析为普通类型
+                        String body = response.getBody();
+                        return parseResponse(body, targetType);
+                    }
                 }
             }
             // 如果无法获取泛型参数，返回null
             return null;
-        } else if (returnType == void.class || returnType == Void.class) {
-            // 如果返回类型是void，直接返回null
-            return null;
         } else {
-            // 否则，尝试将JSON响应体转换为目标类型
-            // 对于泛型类型，需要获取完整的泛型信息
-            Type targetType = method.getGenericReturnType();
-            return parseResponse(body, targetType);
+            // 首先检查是否为文件下载类型（byte[]或InputStream）
+            Object fileResult = handleFileDownload(response, method);
+            if (fileResult != null) {
+                return fileResult;
+            }
+
+            String body = response.getBody();
+
+            if (returnType == void.class || returnType == Void.class) {
+                // 如果返回类型是void，直接返回null
+                return null;
+            } else {
+                // 否则，尝试将JSON响应体转换为目标类型
+                // 对于泛型类型，需要获取完整的泛型信息
+                Type targetType = method.getGenericReturnType();
+                return parseResponse(body, targetType);
+            }
         }
     }
     
@@ -151,8 +171,14 @@ public class RestClientInvocationHandler implements InvocationHandler {
             return null;
         }
         
+        // 检查目标类型是否为String
+        boolean isStringType = false;
+        if (targetType instanceof Class) {
+            isStringType = ((Class<?>) targetType) == String.class;
+        }
+        
         // 如果目标类型是String，直接返回响应体，若响应体为null则返回空字符串
-        if (targetType == String.class) {
+        if (isStringType) {
             return body != null ? body : "";
         }
         
@@ -168,6 +194,60 @@ public class RestClientInvocationHandler implements InvocationHandler {
             return objectMapper.readValue(body, typeReference);
         }
         
+        return null;
+    }
+    
+    /**
+     * 处理文件下载响应
+     */
+    private Object handleFileDownload(HttpResponse response, Method method) throws Exception {
+        Class<?> returnType = method.getReturnType();
+        
+        // 检查是否为异步返回类型（CompletableFuture）
+        if (Future.class.isAssignableFrom(returnType)) {
+            // 获取泛型参数类型
+            Type genericReturnType = method.getGenericReturnType();
+            if (genericReturnType instanceof ParameterizedType) {
+                ParameterizedType parameterizedType = (ParameterizedType) genericReturnType;
+                Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
+                if (actualTypeArguments.length > 0) {
+                    // 获取Future的泛型参数类型
+                    Type targetType = actualTypeArguments[0];
+                    if (targetType instanceof Class) {
+                        Class<?> actualType = (Class<?>) targetType;
+                        return handleFileDownloadByType(response, actualType);
+                    }
+                }
+            }
+        } else {
+            // 同步返回类型
+            return handleFileDownloadByType(response, returnType);
+        }
+        
+        // 如果不是文件下载类型，返回null让其他方法处理
+        return null;
+    }
+    
+    /**
+     * 根据实际类型处理文件下载响应
+     */
+    private Object handleFileDownloadByType(HttpResponse response, Class<?> actualType) throws Exception {
+        // 根据返回类型处理响应
+        if (actualType == byte[].class) {
+            // 返回字节数组
+            if (response.getBinaryBody() != null) {
+                return response.getBinaryBody();
+            } else if (response.getBody() != null) {
+                return response.getBody().getBytes();
+            } else {
+                return new byte[0];
+            }
+        } else if (actualType == InputStream.class) {
+            // 返回输入流
+            return response.getBodyAsStream();
+        }
+        
+        // 如果不是文件下载类型，返回null让其他方法处理
         return null;
     }
 }

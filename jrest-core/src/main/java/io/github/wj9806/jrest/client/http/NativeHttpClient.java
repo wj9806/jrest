@@ -172,27 +172,8 @@ public class NativeHttpClient extends AbstractHttpClient {
     private HttpResponse buildHttpResponse(HttpURLConnection connection) throws IOException {
         int statusCode = connection.getResponseCode();
         
-        // 读取响应体
-        String body = "";
-        try {
-            // 首先尝试获取相应的流
-            InputStream is = statusCode >= 400 ? connection.getErrorStream() : connection.getInputStream();
-            
-            // 如果仍然为null，设置空响应体
-            if (is != null) {
-                try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-                    StringBuilder responseBody = new StringBuilder();
-                    String line;
-                    while ((line = br.readLine()) != null) {
-                        responseBody.append(line);
-                    }
-                    body = responseBody.toString();
-                }
-            }
-            
-        } catch (Exception e) {
-            logger.error("Error reading response body", e);
-        }
+        // 获取Content-Type
+        String contentType = connection.getContentType();
         
         // 构建响应头
         Map<String, String> headers = new HashMap<>();
@@ -203,12 +184,63 @@ public class NativeHttpClient extends AbstractHttpClient {
             i++;
         }
         
-        logger.debug("Response status code: {}", statusCode);
-        logger.debug("Response body: {}", body);
+        // 尝试获取相应的流
+        InputStream is = statusCode >= 400 ? connection.getErrorStream() : connection.getInputStream();
         
-        connection.disconnect();
+        // 如果流为null，返回空响应
+        if (is == null) {
+            connection.disconnect();
+            return new HttpResponse(statusCode, "", headers);
+        }
         
-        return new HttpResponse(statusCode, body, headers);
+        try {
+            // 判断是否为二进制数据（非文本类型）
+            if (contentType != null && 
+                (contentType.startsWith("application/octet-stream") || 
+                 contentType.startsWith("image/") || 
+                 contentType.startsWith("audio/") || 
+                 contentType.startsWith("video/") || 
+                 contentType.endsWith("pdf") || 
+                 contentType.endsWith("zip") || 
+                 contentType.endsWith("rar"))) {
+                
+                // 读取二进制数据
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+                while ((bytesRead = is.read(buffer)) != -1) {
+                    baos.write(buffer, 0, bytesRead);
+                }
+                byte[] binaryBody = baos.toByteArray();
+                
+                logger.debug("Response status code: {}", statusCode);
+                logger.debug("Response content type: {}", contentType);
+                logger.debug("Response body size: {} bytes", binaryBody.length);
+                
+                connection.disconnect();
+                return new HttpResponse(statusCode, binaryBody, headers);
+            } else {
+                // 读取文本数据
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                    StringBuilder responseBody = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        responseBody.append(line);
+                    }
+                    String body = responseBody.toString();
+                    
+                    logger.debug("Response status code: {}", statusCode);
+                    logger.debug("Response body: {}", body);
+                    
+                    connection.disconnect();
+                    return new HttpResponse(statusCode, body, headers);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error reading response body", e);
+            connection.disconnect();
+            return new HttpResponse(statusCode, "", headers);
+        }
     }
     
     @Override
