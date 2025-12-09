@@ -2,6 +2,7 @@ package io.github.wj9806.jrest.client.proxy;
 
 import io.github.wj9806.jrest.client.http.MultipartFile;
 import io.github.wj9806.jrest.client.http.DefaultMultipartFile;
+import io.github.wj9806.jrest.client.http.ContentType;
 import io.github.wj9806.jrest.client.annotation.*;
 import io.github.wj9806.jrest.client.http.HttpRequest;
 import org.slf4j.Logger;
@@ -61,6 +62,9 @@ public class DefaultAnnotationParser implements AnnotationParser {
             throw new IllegalArgumentException("Method must be annotated with HTTP method annotation");
         }
         
+        // 获取Content-Type
+        String contentType = getContentType(method);
+        
         // 构建请求URL
         String requestUrl = buildRequestUrl(method, args, baseUrl);
         
@@ -72,6 +76,11 @@ public class DefaultAnnotationParser implements AnnotationParser {
         Map<String, MultipartFile> multipartFiles = new HashMap<>();
         Map<String, Object> formData = new HashMap<>();
         boolean hasFormData = false;
+        
+        // 设置Content-Type头
+        if (contentType != null && !contentType.isEmpty()) {
+            headers.put("Content-Type", contentType);
+        }
         
         Annotation[][] parameterAnnotations = method.getParameterAnnotations();
         for (int i = 0; i < parameterAnnotations.length; i++) {
@@ -179,6 +188,22 @@ public class DefaultAnnotationParser implements AnnotationParser {
             return "PUT";
         } else if (method.isAnnotationPresent(DELETE.class)) {
             return "DELETE";
+        }
+        return null;
+    }
+    
+    /**
+     * 获取Content-Type
+     */
+    private String getContentType(Method method) {
+        if (method.isAnnotationPresent(GET.class)) {
+            return method.getAnnotation(GET.class).consumes().getValue();
+        } else if (method.isAnnotationPresent(POST.class)) {
+            return method.getAnnotation(POST.class).consumes().getValue();
+        } else if (method.isAnnotationPresent(PUT.class)) {
+            return method.getAnnotation(PUT.class).consumes().getValue();
+        } else if (method.isAnnotationPresent(DELETE.class)) {
+            return method.getAnnotation(DELETE.class).consumes().getValue();
         }
         return null;
     }

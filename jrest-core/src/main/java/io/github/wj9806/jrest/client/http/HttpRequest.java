@@ -164,6 +164,25 @@ public class HttpRequest {
         }
 
         public Builder() {}
+        
+        /**
+         * 从现有HttpRequest创建Builder实例
+         * @param request 现有HttpRequest实例
+         * @return Builder实例
+         */
+        public static Builder newBuilder(HttpRequest request) {
+            Builder builder = new Builder();
+            builder.url(request.getUrl());
+            builder.method(request.getMethod());
+            builder.headers(new HashMap<>(request.getHeaders()));
+            builder.queryParams(new HashMap<>(request.getQueryParams()));
+            builder.cookies(new HashMap<>(request.getCookies()));
+            builder.body(request.getBody());
+            builder.multipartFiles(new HashMap<>(request.getMultipartFiles()));
+            builder.formData(new HashMap<>(request.getFormData()));
+            builder.isFormData = request.isFormData();
+            return builder;
+        }
 
         /**
          * 设置请求URL

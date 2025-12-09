@@ -7,6 +7,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * HttpClient抽象基类，提供拦截器管理功能
@@ -15,22 +19,68 @@ public abstract class AbstractHttpClient implements HttpClient {
     
     private final List<HttpRequestInterceptor> interceptors = new ArrayList<>();
     
+    // 重试策略
+    private Retryer retryer;
+    
+    // 默认重试策略
+    private static final Retryer DEFAULT_RETRYER = new DefaultRetryer();
+    
     @Override
     public HttpResponse exchange(HttpRequest httpRequest) throws IOException {
-        // 请求前拦截 - 按order升序执行
-        for (HttpRequestInterceptor interceptor : interceptors) {
-            interceptor.beforeRequest(httpRequest);
+        int retryCount = 0;
+        HttpResponse httpResponse = null;
+        IOException lastException = null;
+        
+        // 获取重试策略，如果没有设置则使用默认重试策略
+        Retryer currentRetryer = getRetryer();
+        
+        while (true) {
+            try {
+                // 请求前拦截 - 按order升序执行
+                for (HttpRequestInterceptor interceptor : interceptors) {
+                    interceptor.beforeRequest(httpRequest);
+                }
+                
+                // 执行实际请求
+                httpResponse = doExchange(httpRequest);
+                
+                // 响应后拦截 - 按order降序执行
+                for (int i = interceptors.size() - 1; i >= 0; i--) {
+                    interceptors.get(i).afterResponse(httpRequest, httpResponse);
+                }
+                
+                // 检查是否需要重试
+                if (!currentRetryer.shouldRetry(httpRequest, httpResponse, null, retryCount)) {
+                    return httpResponse;
+                }
+                
+                // 需要重试，记录重试信息
+                lastException = null;
+            } catch (IOException e) {
+                // 检查是否需要重试
+                if (!currentRetryer.shouldRetry(httpRequest, null, e, retryCount)) {
+                    throw e;
+                }
+                
+                // 需要重试，记录重试信息
+                lastException = e;
+                httpResponse = null;
+            }
+            
+            // 递增重试次数
+            retryCount++;
+            
+            // 获取延迟时间
+            long delay = currentRetryer.getDelay(retryCount);
+            
+            try {
+                // 等待延迟时间
+                Thread.sleep(delay);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Retry interrupted", ie);
+            }
         }
-        
-        // 执行实际请求
-        HttpResponse httpResponse = doExchange(httpRequest);
-        
-        // 响应后拦截 - 按order降序执行
-        for (int i = interceptors.size() - 1; i >= 0; i--) {
-            interceptors.get(i).afterResponse(httpRequest, httpResponse);
-        }
-        
-        return httpResponse;
     }
     
     /**
@@ -41,6 +91,19 @@ public abstract class AbstractHttpClient implements HttpClient {
      * @throws IOException IO异常
      */
     protected abstract HttpResponse doExchange(HttpRequest httpRequest) throws IOException;
+    
+    /**
+     * 异步执行实际的HTTP请求，由子类实现
+     * 
+     * @param httpRequest HTTP请求对象
+     * @return 包含响应结果的CompletableFuture
+     */
+    protected abstract CompletableFuture<HttpResponse> doExchangeAsync(HttpRequest httpRequest);
+    
+    /**
+     * 调度执行器服务，用于异步请求和重试
+     */
+    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors());
     
     @Override
     public void addInterceptor(HttpRequestInterceptor interceptor) {
@@ -59,5 +122,99 @@ public abstract class AbstractHttpClient implements HttpClient {
     @Override
     public void clearInterceptors() {
         interceptors.clear();
+    }
+    
+    @Override
+    public void setRetryer(Retryer retryer) {
+        this.retryer = retryer;
+    }
+    
+    @Override
+    public CompletableFuture<HttpResponse> exchangeAsync(HttpRequest httpRequest) {
+        // 创建一个新的CompletableFuture用于异步执行
+        CompletableFuture<HttpResponse> future = new CompletableFuture<>();
+        
+        // 启动异步执行
+        executeAsync(httpRequest, future, 0, null);
+        
+        return future;
+    }
+    
+    /**
+     * 异步执行HTTP请求，并处理重试逻辑
+     */
+    private void executeAsync(HttpRequest httpRequest, CompletableFuture<HttpResponse> future, int retryCount, IOException lastException) {
+        // 如果future已被取消，则不再执行
+        if (future.isCancelled()) {
+            return;
+        }
+        
+        // 获取重试策略
+        Retryer currentRetryer = getRetryer();
+        
+        // 创建请求副本，避免并发修改问题
+        HttpRequest requestCopy = HttpRequest.Builder.newBuilder(httpRequest).build();
+        
+        // 请求前拦截 - 按order升序执行
+        for (HttpRequestInterceptor interceptor : interceptors) {
+            interceptor.beforeRequest(requestCopy);
+        }
+        
+        // 异步执行实际请求
+        doExchangeAsync(requestCopy)
+            .thenApply(httpResponse -> {
+                // 响应后拦截 - 按order降序执行
+                for (int i = interceptors.size() - 1; i >= 0; i--) {
+                    interceptors.get(i).afterResponse(requestCopy, httpResponse);
+                }
+                return httpResponse;
+            })
+            .thenAccept(httpResponse -> {
+                // 检查是否需要重试
+                if (!currentRetryer.shouldRetry(requestCopy, httpResponse, null, retryCount)) {
+                    future.complete(httpResponse);
+                } else {
+                    // 需要重试，安排下次重试
+                    scheduleRetry(requestCopy, future, retryCount + 1, null);
+                }
+            })
+            .exceptionally(ex -> {
+                // 提取原始的IOException
+                Throwable cause = ex.getCause();
+                IOException exception;
+                if (cause instanceof IOException) {
+                    exception = (IOException) cause;
+                } else if (ex instanceof IOException) {
+                    exception = (IOException) ex;
+                } else {
+                    exception = new IOException(ex);
+                }
+                
+                // 检查是否需要重试
+                if (!currentRetryer.shouldRetry(requestCopy, null, exception, retryCount)) {
+                    future.completeExceptionally(exception);
+                } else {
+                    // 需要重试，安排下次重试
+                    scheduleRetry(requestCopy, future, retryCount + 1, exception);
+                }
+                
+                return null;
+            });
+    }
+    
+    /**
+     * 安排重试
+     */
+    private void scheduleRetry(HttpRequest httpRequest, CompletableFuture<HttpResponse> future, int retryCount, IOException lastException) {
+        // 获取延迟时间
+        long delay = getRetryer().getDelay(retryCount);
+        
+        // 安排延迟后的重试
+        scheduler.schedule(() -> executeAsync(httpRequest, future, retryCount, lastException), delay, TimeUnit.MILLISECONDS);
+    }
+    
+    @Override
+    public Retryer getRetryer() {
+        return retryer != null ? retryer : DEFAULT_RETRYER;
     }
 }

@@ -50,7 +50,6 @@ public class HttpClientFactory {
                 httpClient = nativeClient;
         }
         
-        System.out.println("Returning HttpClient instance for type: " + clientType + ", instance: " + httpClient.hashCode());
         return httpClient;
     }
     

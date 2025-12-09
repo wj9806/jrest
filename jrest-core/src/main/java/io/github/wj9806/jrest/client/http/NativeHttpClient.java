@@ -12,6 +12,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * 原生HttpURLConnection实现
@@ -20,6 +23,15 @@ public class NativeHttpClient extends AbstractHttpClient {
     
     private static final Logger logger = LoggerFactory.getLogger(NativeHttpClient.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private final ExecutorService executorService;
+    
+    public NativeHttpClient() {
+        this(Executors.newFixedThreadPool(10));
+    }
+    
+    public NativeHttpClient(ExecutorService executorService) {
+        this.executorService = executorService;
+    }
     
     @Override
     protected HttpResponse doExchange(HttpRequest httpRequest) throws IOException {
@@ -161,18 +173,24 @@ public class NativeHttpClient extends AbstractHttpClient {
         int statusCode = connection.getResponseCode();
         
         // 读取响应体
-        String body = null;
-        try (InputStream is = statusCode >= 400 ? connection.getErrorStream() : connection.getInputStream();
-             BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+        String body = "";
+        try {
+            // 首先尝试获取相应的流
+            InputStream is = statusCode >= 400 ? connection.getErrorStream() : connection.getInputStream();
             
-            StringBuilder responseBody = new StringBuilder();
-            String line;
-            while ((line = br.readLine()) != null) {
-                responseBody.append(line);
+            // 如果仍然为null，设置空响应体
+            if (is != null) {
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                    StringBuilder responseBody = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        responseBody.append(line);
+                    }
+                    body = responseBody.toString();
+                }
             }
-            body = responseBody.toString();
             
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("Error reading response body", e);
         }
         
@@ -191,5 +209,22 @@ public class NativeHttpClient extends AbstractHttpClient {
         connection.disconnect();
         
         return new HttpResponse(statusCode, body, headers);
+    }
+    
+    @Override
+    protected CompletableFuture<HttpResponse> doExchangeAsync(HttpRequest httpRequest) {
+        // 使用线程池执行异步请求
+        CompletableFuture<HttpResponse> future = new CompletableFuture<>();
+        executorService.submit(() -> {
+            try {
+                // 调用doExchange方法直接执行请求，不经过拦截器和重试逻辑（由父类executeAsync处理）
+                HttpResponse response = doExchange(httpRequest);
+                future.complete(response);
+            } catch (IOException e) {
+                logger.error("Error executing async request", e);
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
     }
 }

@@ -51,6 +51,19 @@
             <version>${httpclient.version}</version>
             <scope>compile</scope>
         </dependency>
+        <!-- Apache HttpClient Async -->
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpasyncclient</artifactId>
+            <version>4.1.4</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpcore-nio</artifactId>
+            <version>4.4.14</version>
+            <scope>compile</scope>
+        </dependency>
         
         <!-- Jackson for JSON processing -->
         <dependency>

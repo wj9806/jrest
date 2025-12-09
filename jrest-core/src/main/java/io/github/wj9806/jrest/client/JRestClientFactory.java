@@ -2,6 +2,7 @@ package io.github.wj9806.jrest.client;
 
 import io.github.wj9806.jrest.client.http.HttpClient;
 import io.github.wj9806.jrest.client.http.HttpClientFactory;
+import io.github.wj9806.jrest.client.http.Retryer;
 import io.github.wj9806.jrest.client.interceptor.GlobalInterceptorManager;
 import io.github.wj9806.jrest.client.interceptor.HttpRequestInterceptor;
 import io.github.wj9806.jrest.client.proxy.AnnotationParser;
@@ -23,6 +24,7 @@ public class JRestClientFactory {
     private static final Logger logger = LoggerFactory.getLogger(JRestClientFactory.class);
     private final AnnotationParser annotationParser;
     private final List<HttpRequestInterceptor> interceptors;
+    private final Retryer retryer;
 
     /**
      * 私有构造函数，通过Builder创建实例
@@ -30,6 +32,7 @@ public class JRestClientFactory {
     private JRestClientFactory(Builder builder) {
         this.annotationParser = builder.annotationParser;
         this.interceptors = new ArrayList<>(builder.interceptors);
+        this.retryer = builder.retryer;
     }
 
     /**
@@ -49,6 +52,11 @@ public class JRestClientFactory {
         
         // 创建HttpClient实例
         HttpClient httpClient = HttpClientFactory.createHttpClient(clientType);
+        
+        // 设置重试策略
+        if (retryer != null) {
+            httpClient.setRetryer(retryer);
+        }
         
         // 添加全局拦截器
         for (HttpRequestInterceptor interceptor : interceptors) {
@@ -72,6 +80,7 @@ public class JRestClientFactory {
     public static class Builder {
         private AnnotationParser annotationParser = DefaultAnnotationParser.getInstance();
         private final List<HttpRequestInterceptor> interceptors = new ArrayList<>();
+        private Retryer retryer;
 
         /**
          * 设置注解解析器
@@ -94,6 +103,17 @@ public class JRestClientFactory {
             if (interceptor != null) {
                 this.interceptors.add(interceptor);
             }
+            return this;
+        }
+
+        /**
+         * 设置重试策略
+         * 
+         * @param retryer 重试策略
+         * @return Builder实例
+         */
+        public Builder retryer(Retryer retryer) {
+            this.retryer = retryer;
             return this;
         }
 

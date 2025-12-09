@@ -1,14 +1,18 @@
 package io.github.wj9806.jrest.client.http;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.*;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
+import org.apache.http.impl.nio.client.HttpAsyncClients;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +23,7 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Apache HttpClient实现
@@ -28,82 +33,105 @@ public class ApacheHttpClient extends AbstractHttpClient {
     private static final Logger logger = LoggerFactory.getLogger(ApacheHttpClient.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private final CloseableHttpClient httpClient;
+    private final CloseableHttpAsyncClient asyncHttpClient;
 
     public ApacheHttpClient() {
         this.httpClient = HttpClients.createDefault();
+        this.asyncHttpClient = HttpAsyncClients.createDefault();
+        this.asyncHttpClient.start();
     }
     
     public ApacheHttpClient(CloseableHttpClient httpClient) {
         this.httpClient = httpClient;
+        this.asyncHttpClient = HttpAsyncClients.createDefault();
+        this.asyncHttpClient.start();
+    }
+    
+    public ApacheHttpClient(CloseableHttpClient httpClient, CloseableHttpAsyncClient asyncHttpClient) {
+        this.httpClient = httpClient;
+        this.asyncHttpClient = asyncHttpClient;
+        if (!asyncHttpClient.isRunning()) {
+            this.asyncHttpClient.start();
+        }
+    }
+    
+    /**
+     * 构建Apache HttpRequest对象
+     */
+    private HttpRequestBase buildHttpRequest(HttpRequest httpRequest) throws URISyntaxException, IOException {
+        URIBuilder uriBuilder = new URIBuilder(httpRequest.getUrl());
+        
+        // 添加查询参数
+        if (httpRequest.getQueryParams() != null && !httpRequest.getQueryParams().isEmpty()) {
+            Set<Map.Entry<String, Object>> entries = httpRequest.getQueryParams().entrySet();
+            for (Map.Entry<String, Object> entry : entries) {
+                uriBuilder.addParameter(entry.getKey(), entry.getValue().toString());
+            }
+        }
+        
+        // 根据HTTP方法创建相应的请求对象
+        HttpRequestBase requestBase;
+        switch (httpRequest.getMethod().toUpperCase()) {
+            case "GET":
+                requestBase = new HttpGet(uriBuilder.build());
+                break;
+            case "POST":
+                HttpPost httpPost = new HttpPost(uriBuilder.build());
+                // 设置POST请求体
+                if (httpRequest.isFormData()) {
+                    setMultipartRequestBody(httpPost, httpRequest.getBody(), httpRequest.getFormData(), httpRequest.getMultipartFiles());
+                } else {
+                    setRequestBody(httpPost, httpRequest.getBody());
+                }
+                requestBase = httpPost;
+                break;
+            case "PUT":
+                HttpPut httpPut = new HttpPut(uriBuilder.build());
+                // 设置PUT请求体
+                if (httpRequest.isFormData()) {
+                    setMultipartRequestBody(httpPut, httpRequest.getBody(), httpRequest.getFormData(), httpRequest.getMultipartFiles());
+                } else {
+                    setRequestBody(httpPut, httpRequest.getBody());
+                }
+                requestBase = httpPut;
+                break;
+            case "DELETE":
+                requestBase = new HttpDelete(uriBuilder.build());
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported HTTP method: " + httpRequest.getMethod());
+        }
+        
+        // 添加请求头
+        if (httpRequest.getHeaders() != null && !httpRequest.getHeaders().isEmpty()) {
+            httpRequest.getHeaders().forEach(requestBase::addHeader);
+        }
+        
+        // 添加Cookie
+        if (httpRequest.getCookies() != null && !httpRequest.getCookies().isEmpty()) {
+            StringBuilder cookieBuilder = new StringBuilder();
+            for (Map.Entry<String, String> cookie : httpRequest.getCookies().entrySet()) {
+                if (cookieBuilder.length() > 0) {
+                    cookieBuilder.append(";").append(" ");
+                }
+                cookieBuilder.append(cookie.getKey()).append("=").append(cookie.getValue());
+            }
+            requestBase.addHeader("Cookie", cookieBuilder.toString());
+        }
+        
+        return requestBase;
     }
     
     @Override
     protected HttpResponse doExchange(HttpRequest httpRequest) throws IOException {
         try {
-            URIBuilder uriBuilder = new URIBuilder(httpRequest.getUrl());
-            
-            // 添加查询参数
-            if (httpRequest.getQueryParams() != null && !httpRequest.getQueryParams().isEmpty()) {
-                Set<Map.Entry<String, Object>> entries = httpRequest.getQueryParams().entrySet();
-                for (Map.Entry<String, Object> entry : entries) {
-                    uriBuilder.addParameter(entry.getKey(), entry.getValue().toString());
-                }
-            }
-            
-            // 根据HTTP方法创建相应的请求对象
-            HttpRequestBase requestBase;
-            switch (httpRequest.getMethod().toUpperCase()) {
-                case "GET":
-                    requestBase = new HttpGet(uriBuilder.build());
-                    break;
-                case "POST":
-                    HttpPost httpPost = new HttpPost(uriBuilder.build());
-                    // 设置POST请求体
-                    if (httpRequest.isFormData()) {
-                        setMultipartRequestBody(httpPost, httpRequest.getBody(), httpRequest.getFormData(), httpRequest.getMultipartFiles());
-                    } else {
-                        setRequestBody(httpPost, httpRequest.getBody());
-                    }
-                    requestBase = httpPost;
-                    break;
-                case "PUT":
-                    HttpPut httpPut = new HttpPut(uriBuilder.build());
-                    // 设置PUT请求体
-                    if (httpRequest.isFormData()) {
-                        setMultipartRequestBody(httpPut, httpRequest.getBody(), httpRequest.getFormData(), httpRequest.getMultipartFiles());
-                    } else {
-                        setRequestBody(httpPut, httpRequest.getBody());
-                    }
-                    requestBase = httpPut;
-                    break;
-                case "DELETE":
-                    requestBase = new HttpDelete(uriBuilder.build());
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unsupported HTTP method: " + httpRequest.getMethod());
-            }
-            
-            // 添加请求头
-            if (httpRequest.getHeaders() != null && !httpRequest.getHeaders().isEmpty()) {
-                httpRequest.getHeaders().forEach(requestBase::addHeader);
-            }
-            
-            // 添加Cookie
-            if (httpRequest.getCookies() != null && !httpRequest.getCookies().isEmpty()) {
-                StringBuilder cookieBuilder = new StringBuilder();
-                for (Map.Entry<String, String> cookie : httpRequest.getCookies().entrySet()) {
-                    if (cookieBuilder.length() > 0) {
-                        cookieBuilder.append(";");
-                    }
-                    cookieBuilder.append(cookie.getKey()).append("=").append(cookie.getValue());
-                }
-                requestBase.addHeader("Cookie", cookieBuilder.toString());
-            }
+            HttpRequestBase requestBase = buildHttpRequest(httpRequest);
             
             logger.debug("Sending {} request to: {}", httpRequest.getMethod(), requestBase.getURI());
-            CloseableHttpResponse response = httpClient.execute(requestBase);
             
-            return buildHttpResponse(response);
+            try (CloseableHttpResponse response = httpClient.execute(requestBase)) {
+                return buildHttpResponse(response);
+            }
             
         } catch (URISyntaxException e) {
             logger.error("Invalid URI syntax: {}", httpRequest.getUrl(), e);
@@ -119,7 +147,11 @@ public class ApacheHttpClient extends AbstractHttpClient {
             // 处理JSON请求体
             String jsonBody = objectMapper.writeValueAsString(body);
             request.setEntity(new StringEntity(jsonBody, "UTF-8"));
-            request.addHeader("Content-Type", "application/json");
+            
+            // 只有当请求没有设置Content-Type时，才添加默认的JSON Content-Type
+            if (request.getFirstHeader("Content-Type") == null) {
+                request.addHeader("Content-Type", "application/json");
+            }
         }
     }
 
@@ -170,24 +202,61 @@ public class ApacheHttpClient extends AbstractHttpClient {
         request.setEntity(builder.build());
     }
     
+    @Override
+    protected CompletableFuture<HttpResponse> doExchangeAsync(HttpRequest httpRequest) {
+        CompletableFuture<HttpResponse> future = new CompletableFuture<>();
+        
+        try {
+            HttpRequestBase requestBase = buildHttpRequest(httpRequest);
+            
+            logger.debug("Sending async {} request to: {}", httpRequest.getMethod(), requestBase.getURI());
+            
+            // 异步执行请求
+            asyncHttpClient.execute(requestBase, new FutureCallback<org.apache.http.HttpResponse>() {
+                @Override
+                public void completed(org.apache.http.HttpResponse response) {
+                    try {
+                        HttpResponse httpResponse = buildHttpResponse(response);
+                        future.complete(httpResponse);
+                    } catch (IOException e) {
+                        future.completeExceptionally(e);
+                    }
+                }
+                
+                @Override
+                public void failed(Exception ex) {
+                    future.completeExceptionally(ex);
+                }
+                
+                @Override
+                public void cancelled() {
+                    future.cancel(true);
+                }
+            });
+            
+        } catch (URISyntaxException | IOException e) {
+            future.completeExceptionally(e);
+        }
+        
+        return future;
+    }
+    
     /**
-     * 构建HttpResponse对象
+     * 从org.apache.http.HttpResponse构建自定义HttpResponse
      */
-    private HttpResponse buildHttpResponse(CloseableHttpResponse response) throws IOException {
+    private HttpResponse buildHttpResponse(org.apache.http.HttpResponse response) throws IOException {
         int statusCode = response.getStatusLine().getStatusCode();
         HttpEntity entity = response.getEntity();
         String body = entity != null ? EntityUtils.toString(entity, "UTF-8") : null;
         
         // 构建响应头
         Map<String, String> headers = new HashMap<>();
-        for (org.apache.http.Header header : response.getAllHeaders()) {
+        for (Header header : response.getAllHeaders()) {
             headers.put(header.getName(), header.getValue());
         }
         
         logger.debug("Response status code: {}", statusCode);
         logger.debug("Response body: {}", body);
-        
-        response.close();
         
         return new HttpResponse(statusCode, body, headers);
     }
