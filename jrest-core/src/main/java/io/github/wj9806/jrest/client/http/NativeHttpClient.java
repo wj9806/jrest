@@ -1,6 +1,5 @@
 package io.github.wj9806.jrest.client.http;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +21,6 @@ import java.util.concurrent.Executors;
 public class NativeHttpClient extends AbstractHttpClient {
     
     private static final Logger logger = LoggerFactory.getLogger(NativeHttpClient.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
     private final ExecutorService executorService;
     
     public NativeHttpClient() {
@@ -150,18 +148,24 @@ public class NativeHttpClient extends AbstractHttpClient {
                     }
                 } else {
                     // 处理JSON请求体
-                    String jsonBody = objectMapper.writeValueAsString(httpRequest.getBody());
-                    connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                    
-                    try (OutputStream os = connection.getOutputStream()) {
-                        byte[] input = jsonBody.getBytes(StandardCharsets.UTF_8);
-                        os.write(input, 0, input.length);
+                    String contentType = "application/json; charset=UTF-8";
+                    // 使用编解码器管理器编码请求体
+                    try {
+                        byte[] encodedBody = getCodecManager().selectEncoder(contentType).encode(httpRequest.getBody(), contentType);
+                        connection.setRequestProperty("Content-Type", contentType);
+
+                        try (OutputStream os = connection.getOutputStream()) {
+                            os.write(encodedBody);
+                        }
+                    } catch (Exception e) {
+                        logger.error("Error encoding request body", e);
+                        throw new RuntimeException(e);
                     }
                 }
             }
         }
         
-        logger.debug("Sending {} request to: {}", method, urlBuilder.toString());
+        logger.debug("Sending {} request to: {}", method, urlBuilder);
         
         return buildHttpResponse(connection);
     }

@@ -25,12 +25,17 @@ public abstract class AbstractHttpClient implements HttpClient {
     // 默认重试策略
     private static final Retryer DEFAULT_RETRYER = new DefaultRetryer();
     
+    // 编解码器管理器
+    private CodecManager codecManager;
+    
+    // 默认编解码器管理器
+    private static final CodecManager DEFAULT_CODEC_MANAGER = new CodecManager();
+    
     @Override
     public HttpResponse exchange(HttpRequest httpRequest) throws IOException {
         int retryCount = 0;
         HttpResponse httpResponse = null;
-        IOException lastException = null;
-        
+
         // 获取重试策略，如果没有设置则使用默认重试策略
         Retryer currentRetryer = getRetryer();
         
@@ -54,17 +59,11 @@ public abstract class AbstractHttpClient implements HttpClient {
                     return httpResponse;
                 }
                 
-                // 需要重试，记录重试信息
-                lastException = null;
             } catch (IOException e) {
                 // 检查是否需要重试
                 if (!currentRetryer.shouldRetry(httpRequest, null, e, retryCount)) {
                     throw e;
                 }
-                
-                // 需要重试，记录重试信息
-                lastException = e;
-                httpResponse = null;
             }
             
             // 递增重试次数
@@ -135,7 +134,7 @@ public abstract class AbstractHttpClient implements HttpClient {
         CompletableFuture<HttpResponse> future = new CompletableFuture<>();
         
         // 启动异步执行
-        executeAsync(httpRequest, future, 0, null);
+        executeAsync(httpRequest, future, 0);
         
         return future;
     }
@@ -143,7 +142,7 @@ public abstract class AbstractHttpClient implements HttpClient {
     /**
      * 异步执行HTTP请求，并处理重试逻辑
      */
-    private void executeAsync(HttpRequest httpRequest, CompletableFuture<HttpResponse> future, int retryCount, IOException lastException) {
+    private void executeAsync(HttpRequest httpRequest, CompletableFuture<HttpResponse> future, int retryCount) {
         // 如果future已被取消，则不再执行
         if (future.isCancelled()) {
             return;
@@ -175,7 +174,7 @@ public abstract class AbstractHttpClient implements HttpClient {
                     future.complete(httpResponse);
                 } else {
                     // 需要重试，安排下次重试
-                    scheduleRetry(requestCopy, future, retryCount + 1, null);
+                    scheduleRetry(requestCopy, future, retryCount + 1);
                 }
             })
             .exceptionally(ex -> {
@@ -195,7 +194,7 @@ public abstract class AbstractHttpClient implements HttpClient {
                     future.completeExceptionally(exception);
                 } else {
                     // 需要重试，安排下次重试
-                    scheduleRetry(requestCopy, future, retryCount + 1, exception);
+                    scheduleRetry(requestCopy, future, retryCount + 1);
                 }
                 
                 return null;
@@ -205,16 +204,26 @@ public abstract class AbstractHttpClient implements HttpClient {
     /**
      * 安排重试
      */
-    private void scheduleRetry(HttpRequest httpRequest, CompletableFuture<HttpResponse> future, int retryCount, IOException lastException) {
+    private void scheduleRetry(HttpRequest httpRequest, CompletableFuture<HttpResponse> future, int retryCount) {
         // 获取延迟时间
         long delay = getRetryer().getDelay(retryCount);
         
         // 安排延迟后的重试
-        scheduler.schedule(() -> executeAsync(httpRequest, future, retryCount, lastException), delay, TimeUnit.MILLISECONDS);
+        scheduler.schedule(() -> executeAsync(httpRequest, future, retryCount), delay, TimeUnit.MILLISECONDS);
     }
     
     @Override
     public Retryer getRetryer() {
         return retryer != null ? retryer : DEFAULT_RETRYER;
+    }
+    
+    @Override
+    public void setCodecManager(CodecManager codecManager) {
+        this.codecManager = codecManager;
+    }
+    
+    @Override
+    public CodecManager getCodecManager() {
+        return codecManager != null ? codecManager : DEFAULT_CODEC_MANAGER;
     }
 }

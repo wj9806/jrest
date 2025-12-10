@@ -60,4 +60,18 @@ public interface HttpClient {
      * @return 重试策略
      */
     Retryer getRetryer();
+    
+    /**
+     * 设置编解码器管理器
+     * 
+     * @param codecManager 编解码器管理器
+     */
+    void setCodecManager(CodecManager codecManager);
+    
+    /**
+     * 获取编解码器管理器
+     * 
+     * @return 编解码器管理器
+     */
+    CodecManager getCodecManager();
 }

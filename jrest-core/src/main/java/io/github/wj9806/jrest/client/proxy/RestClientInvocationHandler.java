@@ -1,8 +1,5 @@
 package io.github.wj9806.jrest.client.proxy;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wj9806.jrest.client.http.HttpClient;
 import io.github.wj9806.jrest.client.http.HttpRequest;
 import io.github.wj9806.jrest.client.http.HttpResponse;
@@ -14,6 +11,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
@@ -23,8 +21,6 @@ import java.util.concurrent.Future;
 public class RestClientInvocationHandler implements InvocationHandler {
     
     private static final Logger logger = LoggerFactory.getLogger(RestClientInvocationHandler.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     
     private final String baseUrl;
     private final HttpClient httpClient;
@@ -134,8 +130,7 @@ public class RestClientInvocationHandler implements InvocationHandler {
                         return handleFileDownload(response, method);
                     } else {
                         // 否则，解析为普通类型
-                        String body = response.getBody();
-                        return parseResponse(body, targetType);
+                        return parseResponse(response, targetType);
                     }
                 }
             }
@@ -148,53 +143,44 @@ public class RestClientInvocationHandler implements InvocationHandler {
                 return fileResult;
             }
 
-            String body = response.getBody();
-
             if (returnType == void.class || returnType == Void.class) {
                 // 如果返回类型是void，直接返回null
                 return null;
             } else {
-                // 否则，尝试将JSON响应体转换为目标类型
+                // 否则，尝试将响应体转换为目标类型
                 // 对于泛型类型，需要获取完整的泛型信息
                 Type targetType = method.getGenericReturnType();
-                return parseResponse(body, targetType);
+                return parseResponse(response, targetType);
             }
         }
     }
     
     /**
-     * 解析异步响应
+     * 解析响应
      */
-    private Object parseResponse(String body, Type targetType) throws Exception {
+    private Object parseResponse(HttpResponse response, Type targetType) throws Exception {
         // 如果目标类型是void，直接返回null
         if (targetType == void.class || targetType == Void.class) {
             return null;
         }
         
-        // 检查目标类型是否为String
-        boolean isStringType = false;
-        if (targetType instanceof Class) {
-            isStringType = ((Class<?>) targetType) == String.class;
+        String body = response.getBody();
+        
+        // 如果响应体为空，返回null
+        if (body == null || body.isEmpty()) {
+            return null;
         }
         
-        // 如果目标类型是String，直接返回响应体，若响应体为null则返回空字符串
-        if (isStringType) {
-            return body != null ? body : "";
+        // 从响应头中获取内容类型
+        String contentType = "application/json"; // 默认值
+        Map<String, String> headers = response.getHeaders();
+        if (headers != null && headers.containsKey("Content-Type")) {
+            contentType = headers.get("Content-Type");
         }
         
-        // 否则，尝试将JSON响应体转换为目标类型
-        if (body != null && !body.isEmpty()) {
-            // 使用TypeReference处理泛型类型
-            TypeReference<?> typeReference = new TypeReference<Object>() {
-                @Override
-                public java.lang.reflect.Type getType() {
-                    return targetType;
-                }
-            };
-            return objectMapper.readValue(body, typeReference);
-        }
-        
-        return null;
+        // 使用解码器解析响应
+        return httpClient.getCodecManager().selectDecoder(contentType)
+                .decode(body, targetType, contentType);
     }
     
     /**

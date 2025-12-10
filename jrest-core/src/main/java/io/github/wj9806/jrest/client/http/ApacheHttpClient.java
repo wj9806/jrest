@@ -1,6 +1,5 @@
 package io.github.wj9806.jrest.client.http;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.*;
@@ -20,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +31,6 @@ import java.util.concurrent.CompletableFuture;
 public class ApacheHttpClient extends AbstractHttpClient {
     
     private static final Logger logger = LoggerFactory.getLogger(ApacheHttpClient.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
     private final CloseableHttpClient httpClient;
     private final CloseableHttpAsyncClient asyncHttpClient;
 
@@ -58,7 +57,7 @@ public class ApacheHttpClient extends AbstractHttpClient {
     /**
      * 构建Apache HttpRequest对象
      */
-    private HttpRequestBase buildHttpRequest(HttpRequest httpRequest) throws URISyntaxException, IOException {
+    private HttpRequestBase buildHttpRequest(HttpRequest httpRequest) throws Exception {
         URIBuilder uriBuilder = new URIBuilder(httpRequest.getUrl());
         
         // 添加查询参数
@@ -136,21 +135,30 @@ public class ApacheHttpClient extends AbstractHttpClient {
         } catch (URISyntaxException e) {
             logger.error("Invalid URI syntax: {}", httpRequest.getUrl(), e);
             throw new IOException("Invalid URI syntax", e);
+        } catch (Exception e) {
+            logger.error("Error building or executing request", e);
+            throw new IOException("Error processing request", e);
         }
     }
     
     /**
      * 设置请求体
      */
-    private void setRequestBody(HttpEntityEnclosingRequestBase request, Object body) throws IOException {
+    private void setRequestBody(HttpEntityEnclosingRequestBase request, Object body) throws Exception {
         if (body != null) {
-            // 处理JSON请求体
-            String jsonBody = objectMapper.writeValueAsString(body);
-            request.setEntity(new StringEntity(jsonBody, "UTF-8"));
+            // 获取内容类型
+            String contentType = "application/json";
+            if (request.getFirstHeader("Content-Type") != null) {
+                contentType = request.getFirstHeader("Content-Type").getValue();
+            }
+            
+            // 使用编码器编码请求体
+            byte[] bytes = getCodecManager().selectEncoder(contentType).encode(body, contentType);
+            request.setEntity(new StringEntity(new String(bytes, StandardCharsets.UTF_8), "UTF-8"));
             
             // 只有当请求没有设置Content-Type时，才添加默认的JSON Content-Type
             if (request.getFirstHeader("Content-Type") == null) {
-                request.addHeader("Content-Type", "application/json");
+                request.addHeader("Content-Type", contentType);
             }
         }
     }
@@ -234,7 +242,7 @@ public class ApacheHttpClient extends AbstractHttpClient {
                 }
             });
             
-        } catch (URISyntaxException | IOException e) {
+        } catch (Exception e) {
             future.completeExceptionally(e);
         }
         

@@ -51,6 +51,9 @@ public class FileDownloadTest {
         
         System.out.println("File downloaded as bytes, size: " + bytes.length + " bytes");
         System.out.println("File saved to: " + path.toAbsolutePath());
+
+        assert Files.exists(path);
+        Files.delete(path);
     }
     
     @Test
@@ -75,5 +78,7 @@ public class FileDownloadTest {
             System.out.println("File downloaded as stream, size: " + totalBytes + " bytes");
             System.out.println("File saved to: " + Paths.get("test-download-stream.pdf").toAbsolutePath());
         }
+        assert Files.exists(Paths.get("test-download-stream.pdf"));
+        Files.delete(Paths.get("test-download-stream.pdf"));
     }
 }

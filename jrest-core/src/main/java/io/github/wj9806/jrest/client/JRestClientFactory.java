@@ -1,8 +1,11 @@
 package io.github.wj9806.jrest.client;
 
+import io.github.wj9806.jrest.client.http.CodecManager;
 import io.github.wj9806.jrest.client.http.HttpClient;
 import io.github.wj9806.jrest.client.http.HttpClientFactory;
 import io.github.wj9806.jrest.client.http.Retryer;
+import io.github.wj9806.jrest.client.http.decode.Decoder;
+import io.github.wj9806.jrest.client.http.encode.Encoder;
 import io.github.wj9806.jrest.client.interceptor.GlobalInterceptorManager;
 import io.github.wj9806.jrest.client.interceptor.HttpRequestInterceptor;
 import io.github.wj9806.jrest.client.proxy.AnnotationParser;
@@ -25,6 +28,7 @@ public class JRestClientFactory {
     private final AnnotationParser annotationParser;
     private final List<HttpRequestInterceptor> interceptors;
     private final Retryer retryer;
+    private final CodecManager codecManager;
 
     /**
      * 私有构造函数，通过Builder创建实例
@@ -33,6 +37,7 @@ public class JRestClientFactory {
         this.annotationParser = builder.annotationParser;
         this.interceptors = new ArrayList<>(builder.interceptors);
         this.retryer = builder.retryer;
+        this.codecManager = builder.codecManager;
     }
 
     /**
@@ -58,6 +63,11 @@ public class JRestClientFactory {
             httpClient.setRetryer(retryer);
         }
         
+        // 设置编解码器管理器
+        if (codecManager != null) {
+            httpClient.setCodecManager(codecManager);
+        }
+        
         // 添加全局拦截器
         for (HttpRequestInterceptor interceptor : interceptors) {
             httpClient.addInterceptor(interceptor);
@@ -81,6 +91,7 @@ public class JRestClientFactory {
         private AnnotationParser annotationParser = DefaultAnnotationParser.getInstance();
         private final List<HttpRequestInterceptor> interceptors = new ArrayList<>();
         private Retryer retryer;
+        private CodecManager codecManager;
 
         /**
          * 设置注解解析器
@@ -90,6 +101,45 @@ public class JRestClientFactory {
          */
         public Builder annotationParser(AnnotationParser annotationParser) {
             this.annotationParser = annotationParser;
+            return this;
+        }
+        
+        /**
+         * 设置编解码器管理器
+         * 
+         * @param codecManager 编解码器管理器实例
+         * @return Builder实例
+         */
+        public Builder codecManager(CodecManager codecManager) {
+            this.codecManager = codecManager;
+            return this;
+        }
+        
+        /**
+         * 添加编码器
+         * 
+         * @param encoder 编码器实例
+         * @return Builder实例
+         */
+        public Builder addEncoder(Encoder encoder) {
+            if (codecManager == null) {
+                codecManager = new CodecManager();
+            }
+            codecManager.addEncoder(encoder);
+            return this;
+        }
+        
+        /**
+         * 添加解码器
+         * 
+         * @param decoder 解码器实例
+         * @return Builder实例
+         */
+        public Builder addDecoder(Decoder decoder) {
+            if (codecManager == null) {
+                codecManager = new CodecManager();
+            }
+            codecManager.addDecoder(decoder);
             return this;
         }
 
