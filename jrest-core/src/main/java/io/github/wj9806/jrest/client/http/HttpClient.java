@@ -74,4 +74,32 @@ public interface HttpClient {
      * @return 编解码器管理器
      */
     CodecManager getCodecManager();
+    
+    /**
+     * 设置连接超时时间
+     * 
+     * @param connectTimeout 连接超时时间（毫秒）
+     */
+    void setConnectTimeout(int connectTimeout);
+    
+    /**
+     * 获取连接超时时间
+     * 
+     * @return 连接超时时间（毫秒）
+     */
+    int getConnectTimeout();
+    
+    /**
+     * 设置读取超时时间
+     * 
+     * @param readTimeout 读取超时时间（毫秒）
+     */
+    void setReadTimeout(int readTimeout);
+    
+    /**
+     * 获取读取超时时间
+     * 
+     * @return 读取超时时间（毫秒）
+     */
+    int getReadTimeout();
 }

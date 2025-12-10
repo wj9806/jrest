@@ -2,6 +2,7 @@ package io.github.wj9806.jrest.client.http;
 
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.*;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.concurrent.FutureCallback;
@@ -35,14 +36,14 @@ public class ApacheHttpClient extends AbstractHttpClient {
     private final CloseableHttpAsyncClient asyncHttpClient;
 
     public ApacheHttpClient() {
-        this.httpClient = HttpClients.createDefault();
-        this.asyncHttpClient = HttpAsyncClients.createDefault();
+        this.httpClient = buildHttpClient();
+        this.asyncHttpClient = buildAsyncHttpClient();
         this.asyncHttpClient.start();
     }
     
     public ApacheHttpClient(CloseableHttpClient httpClient) {
         this.httpClient = httpClient;
-        this.asyncHttpClient = HttpAsyncClients.createDefault();
+        this.asyncHttpClient = buildAsyncHttpClient();
         this.asyncHttpClient.start();
     }
     
@@ -52,6 +53,45 @@ public class ApacheHttpClient extends AbstractHttpClient {
         if (!asyncHttpClient.isRunning()) {
             this.asyncHttpClient.start();
         }
+    }
+    
+    /**
+     * 构建HttpClient实例
+     */
+    private CloseableHttpClient buildHttpClient() {
+        return HttpClients.custom()
+                .setDefaultRequestConfig(buildRequestConfig())
+                .build();
+    }
+    
+    /**
+     * 构建异步HttpClient实例
+     */
+    private CloseableHttpAsyncClient buildAsyncHttpClient() {
+        return HttpAsyncClients.custom()
+                .setDefaultRequestConfig(buildRequestConfig())
+                .build();
+    }
+    
+    /**
+     * 构建RequestConfig实例
+     */
+    private RequestConfig buildRequestConfig() {
+        return RequestConfig.custom()
+                .setConnectionRequestTimeout(getConnectTimeout())
+                .setConnectTimeout(getConnectTimeout())
+                .setSocketTimeout(getReadTimeout())
+                .build();
+    }
+    
+    @Override
+    public void setConnectTimeout(int connectTimeout) {
+        super.setConnectTimeout(connectTimeout);
+    }
+    
+    @Override
+    public void setReadTimeout(int readTimeout) {
+        super.setReadTimeout(readTimeout);
     }
     
     /**

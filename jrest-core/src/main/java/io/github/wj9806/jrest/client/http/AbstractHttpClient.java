@@ -31,6 +31,18 @@ public abstract class AbstractHttpClient implements HttpClient {
     // 默认编解码器管理器
     private static final CodecManager DEFAULT_CODEC_MANAGER = new CodecManager();
     
+    // 默认连接超时时间（毫秒）
+    private static final int DEFAULT_CONNECT_TIMEOUT = 30000;
+    
+    // 默认读取超时时间（毫秒）
+    private static final int DEFAULT_READ_TIMEOUT = 30000;
+    
+    // 连接超时时间（毫秒）
+    private int connectTimeout = DEFAULT_CONNECT_TIMEOUT;
+    
+    // 读取超时时间（毫秒）
+    private int readTimeout = DEFAULT_READ_TIMEOUT;
+    
     @Override
     public HttpResponse exchange(HttpRequest httpRequest) throws IOException {
         int retryCount = 0;
@@ -225,5 +237,25 @@ public abstract class AbstractHttpClient implements HttpClient {
     @Override
     public CodecManager getCodecManager() {
         return codecManager != null ? codecManager : DEFAULT_CODEC_MANAGER;
+    }
+    
+    @Override
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
+    
+    @Override
+    public int getConnectTimeout() {
+        return connectTimeout;
+    }
+    
+    @Override
+    public void setReadTimeout(int readTimeout) {
+        this.readTimeout = readTimeout;
+    }
+    
+    @Override
+    public int getReadTimeout() {
+        return readTimeout;
     }
 }

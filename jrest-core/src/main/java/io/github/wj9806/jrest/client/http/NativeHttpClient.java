@@ -50,6 +50,9 @@ public class NativeHttpClient extends AbstractHttpClient {
         
         URL httpUrl = new URL(urlBuilder.toString());
         HttpURLConnection connection = (HttpURLConnection) httpUrl.openConnection();
+        // 设置超时时间
+        connection.setConnectTimeout(getConnectTimeout());
+        connection.setReadTimeout(getReadTimeout());
         String method = httpRequest.getMethod().toUpperCase();
         connection.setRequestMethod(method);
         

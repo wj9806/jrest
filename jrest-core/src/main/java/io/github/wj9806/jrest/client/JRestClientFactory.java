@@ -29,6 +29,8 @@ public class JRestClientFactory {
     private final List<HttpRequestInterceptor> interceptors;
     private final Retryer retryer;
     private final CodecManager codecManager;
+    private final int connectTimeout;
+    private final int readTimeout;
 
     /**
      * 私有构造函数，通过Builder创建实例
@@ -38,6 +40,8 @@ public class JRestClientFactory {
         this.interceptors = new ArrayList<>(builder.interceptors);
         this.retryer = builder.retryer;
         this.codecManager = builder.codecManager;
+        this.connectTimeout = builder.connectTimeout;
+        this.readTimeout = builder.readTimeout;
     }
 
     /**
@@ -57,6 +61,10 @@ public class JRestClientFactory {
         
         // 创建HttpClient实例
         HttpClient httpClient = HttpClientFactory.createHttpClient(clientType);
+        
+        // 设置超时时间
+        httpClient.setConnectTimeout(connectTimeout);
+        httpClient.setReadTimeout(readTimeout);
         
         // 设置重试策略
         if (retryer != null) {
@@ -92,6 +100,8 @@ public class JRestClientFactory {
         private final List<HttpRequestInterceptor> interceptors = new ArrayList<>();
         private Retryer retryer;
         private CodecManager codecManager;
+        private int connectTimeout = 30000;
+        private int readTimeout = 30000;
 
         /**
          * 设置注解解析器
@@ -112,6 +122,28 @@ public class JRestClientFactory {
          */
         public Builder codecManager(CodecManager codecManager) {
             this.codecManager = codecManager;
+            return this;
+        }
+        
+        /**
+         * 设置连接超时时间
+         * 
+         * @param connectTimeout 连接超时时间（毫秒）
+         * @return Builder实例
+         */
+        public Builder connectTimeout(int connectTimeout) {
+            this.connectTimeout = connectTimeout;
+            return this;
+        }
+        
+        /**
+         * 设置读取超时时间
+         * 
+         * @param readTimeout 读取超时时间（毫秒）
+         * @return Builder实例
+         */
+        public Builder readTimeout(int readTimeout) {
+            this.readTimeout = readTimeout;
             return this;
         }
         
