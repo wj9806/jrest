@@ -8,9 +8,9 @@ import io.github.wj9806.jrest.client.http.decode.Decoder;
 import io.github.wj9806.jrest.client.http.encode.Encoder;
 import io.github.wj9806.jrest.client.interceptor.GlobalInterceptorManager;
 import io.github.wj9806.jrest.client.interceptor.HttpRequestInterceptor;
-import io.github.wj9806.jrest.client.proxy.AnnotationParser;
+import io.github.wj9806.jrest.client.annotation.AnnotationParser;
 import io.github.wj9806.jrest.client.proxy.ClientType;
-import io.github.wj9806.jrest.client.proxy.DefaultAnnotationParser;
+import io.github.wj9806.jrest.client.annotation.DefaultAnnotationParser;
 import io.github.wj9806.jrest.client.proxy.RestClientInvocationHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +86,7 @@ public class JRestClientFactory {
         Object client = Proxy.newProxyInstance(
                 clazz.getClassLoader(),
                 new Class<?>[]{clazz},
-                new RestClientInvocationHandler(baseUrl, httpClient)
+                new RestClientInvocationHandler(baseUrl, httpClient, annotationParser)
         );
         
         return clazz.cast(client);
@@ -110,7 +110,9 @@ public class JRestClientFactory {
          * @return Builder实例
          */
         public Builder annotationParser(AnnotationParser annotationParser) {
-            this.annotationParser = annotationParser;
+            if (annotationParser != null) {
+                this.annotationParser = annotationParser;
+            }
             return this;
         }
         
@@ -195,7 +197,9 @@ public class JRestClientFactory {
          * @return Builder实例
          */
         public Builder retryer(Retryer retryer) {
-            this.retryer = retryer;
+            if (retryer != null) {
+                this.retryer = retryer;
+            }
             return this;
         }
 

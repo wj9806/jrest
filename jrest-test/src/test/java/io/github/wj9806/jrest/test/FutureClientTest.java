@@ -5,13 +5,13 @@ import io.github.wj9806.jrest.client.annotation.GET;
 import io.github.wj9806.jrest.client.annotation.PathParam;
 import io.github.wj9806.jrest.client.annotation.RestClient;
 import io.github.wj9806.jrest.client.proxy.ClientType;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Future返回值支持测试

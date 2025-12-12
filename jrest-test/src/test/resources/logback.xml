@@ -15,5 +15,5 @@
     </root>
 
     <logger name="io.github.wj9806.jrest.client" level="INFO"/>
-    
+
 </configuration>

@@ -11,6 +11,7 @@
     <modules>
         <module>jrest-core</module>
         <module>jrest-test</module>
+        <module>jrest-spring-boot-starter</module>
     </modules>
 
     <properties>

@@ -2,7 +2,7 @@ package io.github.wj9806.jrest.test;
 
 import io.github.wj9806.jrest.client.interceptor.LoggingInterceptor;
 import io.github.wj9806.jrest.client.JRestClientFactory;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 

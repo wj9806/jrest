@@ -5,7 +5,7 @@ import io.github.wj9806.jrest.client.annotation.GET;
 import io.github.wj9806.jrest.client.annotation.Header;
 import io.github.wj9806.jrest.client.annotation.RestClient;
 import io.github.wj9806.jrest.client.proxy.ClientType;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Header注解测试类

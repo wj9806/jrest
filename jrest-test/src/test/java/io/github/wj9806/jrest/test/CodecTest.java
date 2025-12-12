@@ -13,16 +13,16 @@ import io.github.wj9806.jrest.client.http.decode.JacksonDecoder;
 import io.github.wj9806.jrest.client.http.encode.JacksonEncoder;
 import io.github.wj9806.jrest.client.http.CodecManager;
 import lombok.Data;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Type;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class CodecTest {
 
     @RestClient(baseUrl = "http://localhost:8080")
-    interface TestClient {
+    public interface TestClient {
         @GET("/test/test")
         String test();
 
@@ -115,7 +115,7 @@ public class CodecTest {
 
     @Data
     @JacksonXmlRootElement(localName = "user")
-    static class XmlUser {
+    public static class XmlUser {
         @JacksonXmlProperty(localName = "id")
         private Long id;
 

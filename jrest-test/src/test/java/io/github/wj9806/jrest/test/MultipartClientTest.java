@@ -5,7 +5,7 @@ import io.github.wj9806.jrest.client.JRestClientFactory;
 import io.github.wj9806.jrest.client.http.MultipartFile;
 import io.github.wj9806.jrest.client.annotation.*;
 import io.github.wj9806.jrest.client.proxy.ClientType;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.FileWriter;

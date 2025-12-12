@@ -1,6 +1,8 @@
-package io.github.wj9806.jrest.client.proxy;
+package io.github.wj9806.jrest.client.annotation;
 
 import io.github.wj9806.jrest.client.http.HttpRequest;
+import io.github.wj9806.jrest.client.proxy.ClientType;
+
 import java.lang.reflect.Method;
 
 /**

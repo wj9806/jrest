@@ -9,7 +9,7 @@ import io.github.wj9806.jrest.client.http.Retryer;
 import io.github.wj9806.jrest.client.interceptor.HttpRequestInterceptor;
 import io.github.wj9806.jrest.client.http.HttpRequest;
 import io.github.wj9806.jrest.client.proxy.ClientType;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;

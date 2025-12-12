@@ -1,5 +1,7 @@
 package io.github.wj9806.jrest.client.proxy;
 
+import io.github.wj9806.jrest.client.annotation.AnnotationParser;
+import io.github.wj9806.jrest.client.annotation.DefaultAnnotationParser;
 import io.github.wj9806.jrest.client.http.HttpClient;
 import io.github.wj9806.jrest.client.http.HttpRequest;
 import io.github.wj9806.jrest.client.http.HttpResponse;
@@ -26,10 +28,10 @@ public class RestClientInvocationHandler implements InvocationHandler {
     private final HttpClient httpClient;
     private final AnnotationParser annotationParser;
     
-    public RestClientInvocationHandler(String baseUrl, HttpClient httpClient) {
+    public RestClientInvocationHandler(String baseUrl, HttpClient httpClient, AnnotationParser annotationParser) {
         this.baseUrl = baseUrl;
         this.httpClient = httpClient;
-        this.annotationParser = DefaultAnnotationParser.getInstance();
+        this.annotationParser = annotationParser == null ? DefaultAnnotationParser.getInstance() : annotationParser;
     }
     
     @Override

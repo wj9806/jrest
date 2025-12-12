@@ -5,8 +5,9 @@ import io.github.wj9806.jrest.client.annotation.POST;
 import io.github.wj9806.jrest.client.annotation.RestClient;
 import io.github.wj9806.jrest.client.annotation.RequestBody;
 import io.github.wj9806.jrest.client.http.ContentType;
-import org.junit.Test;
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * 测试consumes参数功能

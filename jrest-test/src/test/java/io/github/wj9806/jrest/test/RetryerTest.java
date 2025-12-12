@@ -2,7 +2,7 @@ package io.github.wj9806.jrest.test;
 
 import io.github.wj9806.jrest.client.http.DefaultRetryer;
 import io.github.wj9806.jrest.client.http.Retryer;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 

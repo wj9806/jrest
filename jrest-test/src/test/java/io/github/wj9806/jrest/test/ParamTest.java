@@ -3,7 +3,7 @@ package io.github.wj9806.jrest.test;
 import io.github.wj9806.jrest.client.JRestClientFactory;
 import io.github.wj9806.jrest.client.annotation.GET;
 import io.github.wj9806.jrest.client.annotation.RestClient;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class ParamTest {
 

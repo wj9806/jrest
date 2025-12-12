@@ -2,15 +2,16 @@ package io.github.wj9806.jrest.test;
 
 import io.github.wj9806.jrest.client.http.HttpClientFactory;
 import io.github.wj9806.jrest.client.proxy.ClientType;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+
 
 /**
  * 测试HttpClientFactory在多线程环境下的单例实现
@@ -46,7 +47,7 @@ public class HttpClientFactoryMultiThreadTest {
         System.out.println("httpClient2类: " + nativeClient2.getClass());
         System.out.println("httpClient1和httpClient2是否是同一个类: " + (nativeClient1.getClass() == nativeClient2.getClass()));
         
-        assertSame("Native HttpClient实例应该是同一个对象", nativeClient1, nativeClient2);
+        assertSame(nativeClient1, nativeClient2, "Native HttpClient实例应该是同一个对象");
         
         Object apacheClient1 = HttpClientFactory.createHttpClient(ClientType.APACHE);
         Object apacheClient2 = HttpClientFactory.createHttpClient(ClientType.APACHE);
@@ -61,10 +62,10 @@ public class HttpClientFactoryMultiThreadTest {
         System.out.println("简单测试 - Apache实例1: " + apacheClient1.hashCode() + ", 实例: " + apacheClient1);
         System.out.println("简单测试 - Apache实例2: " + apacheClient2.hashCode() + ", 实例: " + apacheClient2);
         
-        assertSame("Apache HttpClient实例应该是同一个对象", apacheClient1, apacheClient2);
+        assertSame(apacheClient1, apacheClient2, "Apache HttpClient实例应该是同一个对象");
         
         // 验证不同ClientType的HttpClient实例是不同的对象
-        assertNotSame("Native和Apache HttpClient实例应该是不同的对象", nativeClient1, apacheClient1);
+        assertNotSame(nativeClient1, apacheClient1, "Native和Apache HttpClient实例应该是不同的对象");
         
         System.out.println("简单测试通过！");
     }
@@ -109,7 +110,7 @@ public class HttpClientFactoryMultiThreadTest {
         System.out.println("测试主线程获取到的Native实例2: " + nativeClient2.hashCode());
         System.out.println("测试主线程 - HttpClientFactory类加载器: " + HttpClientFactory.class.getClassLoader());
         System.out.println("测试主线程 - NativeHttpClient类加载器: " + nativeClient1.getClass().getClassLoader());
-        assertSame("Native HttpClient实例应该是同一个对象", nativeClient1, nativeClient2);
+        assertSame(nativeClient1, nativeClient2, "Native HttpClient实例应该是同一个对象");
         
         System.out.println("多线程测试通过！");
     }

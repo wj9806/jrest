@@ -2,12 +2,12 @@ package io.github.wj9806.jrest.test;
 
 import io.github.wj9806.jrest.client.http.encode.XmlEncoder;
 import io.github.wj9806.jrest.client.http.decode.XmlDecoder;
-import org.junit.Test;
 
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 测试XML编解码器功能

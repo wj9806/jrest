@@ -1,0 +1,3 @@
+# Spring Boot Auto Configure
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+io.github.wj9806.jrest.spring.config.RestClientAutoConfiguration
