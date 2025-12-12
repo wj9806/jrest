@@ -1,6 +1,6 @@
 # JRest - 轻量级REST客户端框架
 
-JRest是一个基于Java的轻量级REST客户端框架，通过注解和代理模式简化REST API的调用。
+JRest是一个基于Java的轻量级REST客户端框架，通过注解和代理模式简化REST API的调用，支持Spring MVC注解风格。
 
 ## 特性
 
@@ -12,6 +12,8 @@ JRest是一个基于Java的轻量级REST客户端框架，通过注解和代理�
 - 📦 **编解码支持**：内置JSON等多种编解码器
 - 📝 **异步支持**：支持异步HTTP请求
 - 🎨 **简洁API**：简单易用的API设计
+- 🌱 **Spring Boot集成**：提供Spring Boot自动配置支持
+- 📌 **Spring MVC注解支持**：支持使用Spring MVC注解定义接口
 
 ## 快速开始
 
@@ -19,11 +21,21 @@ JRest是一个基于Java的轻量级REST客户端框架，通过注解和代理�
 
 在您的Maven项目中添加以下依赖：
 
+#### 核心库
 ```xml
 <dependency>
     <groupId>io.github.wj9806</groupId>
     <artifactId>jrest-core</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>${revision}</version>
+</dependency>
+```
+
+#### Spring Boot集成
+```xml
+<dependency>
+    <groupId>io.github.wj9806</groupId>
+    <artifactId>jrest-spring-boot-starter</artifactId>
+    <version>${revision}</version>
 </dependency>
 ```
 
@@ -31,16 +43,31 @@ JRest是一个基于Java的轻量级REST客户端框架，通过注解和代理�
 
 创建一个接口并使用`@RestClient`注解标记：
 
+#### 使用JRest注解
 ```java
 import io.github.wj9806.jrest.client.annotation.RestClient;
-import io.github.wj9806.jrest.client.annotation.Get;
+import io.github.wj9806.jrest.client.annotation.GET;
 import io.github.wj9806.jrest.client.annotation.Path;
 
 @RestClient(baseUrl = "https://api.github.com")
 public interface GitHubClient {
     
-    @Get("/users/{username}")
+    @GET("/users/{username}")
     User getUser(@Path("username") String username);
+}
+```
+
+#### 使用Spring MVC注解
+```java
+import io.github.wj9806.jrest.client.annotation.RestClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+@RestClient(baseUrl = "https://api.github.com")
+public interface GitHubClient {
+    
+    @GetMapping("/users/{username}")
+    User getUser(@PathVariable("username") String username);
 }
 ```
 
@@ -133,23 +160,37 @@ public interface GitHubClient {
 
 - `@RestClient`：标记接口为REST客户端，指定基础URL和客户端类型
 
-### 方法级别注解
+### JRest注解
 
-- `@Get`：GET请求
-- `@Post`：POST请求
-- `@Put`：PUT请求
-- `@Delete`：DELETE请求
-- `@Patch`：PATCH请求
-- `@Headers`：设置请求头
-- `@Consumes`：指定请求内容类型
-- `@Produces`：指定响应内容类型
+#### 方法级别注解
 
-### 参数级别注解
+- `@GET`：GET请求
+- `@POST`：POST请求
+- `@PUT`：PUT请求
+- `@DELETE`：DELETE请求
+
+#### 参数级别注解
 
 - `@Path`：路径参数
 - `@Query`：查询参数
 - `@Body`：请求体
 - `@Header`：请求头参数
+
+### Spring MVC注解支持
+
+#### 方法级别注解
+
+- `@GetMapping`：GET请求
+- `@PostMapping`：POST请求
+- `@PutMapping`：PUT请求
+- `@DeleteMapping`：DELETE请求
+
+#### 参数级别注解
+
+- `@PathVariable`：路径参数
+- `@RequestParam`：查询参数
+- `@RequestBody`：请求体
+- `@RequestHeader`：请求头参数
 
 ## 异步支持
 
@@ -178,22 +219,16 @@ User user = future.get();
 @RestClient(baseUrl = "https://example.com")
 public interface FileUploadClient {
     
-    @Post("/upload")
+    @POST("/upload")
     String uploadFile(@RequestPart MultipartFile file, @FormField("description") String description);
 }
-```
 
 ## 项目结构
 
 ```
 jrest/
-├── jrest-core/           # 核心库
-├── jrest-test/           # 测试模块
-└── README.md            # 项目文档
+├── jrest-core/                  # 核心库
+├── jrest-test/                  # 测试模块
+├── jrest-spring-boot-starter/   # Spring Boot集成模块
+└── README.md                    # 项目文档
 ```
-
-## 依赖
-
-- Apache HttpClient 4.5.13
-- Jackson 2.12.5
-- SLF4J 1.7.32

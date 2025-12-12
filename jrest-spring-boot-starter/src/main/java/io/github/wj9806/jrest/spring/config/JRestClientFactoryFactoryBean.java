@@ -34,6 +34,9 @@ public class JRestClientFactoryFactoryBean implements FactoryBean<JRestClientFac
         applicationContext.getBeanProvider(HttpRequestInterceptor.class)
                 .forEach(builder::addInterceptor);
 
+        applicationContext.getBeanProvider(JRestClientFactoryBuilderConfigure.class)
+                .forEach(configure -> configure.configure(builder));
+
         return builder.build();
     }
 

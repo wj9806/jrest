@@ -6,7 +6,7 @@
     <parent>
         <groupId>io.github.wj9806</groupId>
         <artifactId>jrest</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>${revision}</version>
     </parent>
 
     <artifactId>jrest-spring-boot-starter</artifactId>
@@ -35,14 +35,12 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-web</artifactId>
-            <version>5.3.39</version>
             <scope>compile</scope>
         </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
-            <version>2.7.18</version>
             <scope>compile</scope>
         </dependency>
 
@@ -57,7 +55,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
-            <version>2.7.18</version>
             <scope>test</scope>
         </dependency>
 
