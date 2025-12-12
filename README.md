@@ -222,6 +222,7 @@ public interface FileUploadClient {
     @POST("/upload")
     String uploadFile(@RequestPart MultipartFile file, @FormField("description") String description);
 }
+```
 
 ## 项目结构
 
